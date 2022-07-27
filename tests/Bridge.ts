@@ -1,5 +1,6 @@
 import * as anchor from "@project-serum/anchor";
 import { Program } from "@project-serum/anchor";
+import { BN } from "bn.js";
 import { Bridge } from "../target/types/bridge";
 
 describe("Bridge", () => {
@@ -10,10 +11,12 @@ describe("Bridge", () => {
 
   it("Is initialized!", async () => {
     // Add your test here.
-    await program.addEventListener("MyEvent",(success)=>{
-      console.log(success)
+    let amount = new BN(1);
+    const tx = await program.methods.freezeToken(amount,{
+      accounts:{
+
+      }
     })
-    const tx = await program.methods.freezeToken().rpc();
     console.log("Your transaction signature", tx);
   });
 });
