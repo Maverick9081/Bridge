@@ -31,14 +31,23 @@ pub mod bridge {
 
 
     pub fn release_token(ctx: Context<ReleaseToken>, amount: u64) ->Result<()> {
+
+        const ESCROW_PDA_SEED: &[u8] = b"escrow";
+        let (_vault_authority, vault_authority_bump) =
+            Pubkey::find_program_address(&[ESCROW_PDA_SEED], ctx.program_id);
+        let authority_seeds = &[&ESCROW_PDA_SEED[..], &[vault_authority_bump]];
+
+        token::transfer(
+            ctx.accounts
+                .into_transfer_to_receiver_context()
+                .with_signer(&[&authority_seeds[..]]),
+            amount
+        )?;
        
-        msg!("starting tokens: {}", ctx.accounts.sender_token.amount);
-        token::transfer(ctx.accounts.transfer_ctx(), amount)?;
-        ctx.accounts.sender_token.reload()?;
         emit!(MyEvent {
         data: 5
     });
-        msg!("remaining tokens: {}", ctx.accounts.sender_token.amount);
+        // msg!("remaining tokens: {}", ctx.accounts.sender_token.amount);
         Ok(())
     }
 }
@@ -68,17 +77,20 @@ pub struct FreezeToken<'info> {
 
 #[derive(Accounts)]
 pub struct ReleaseToken<'info> {
+   #[account(mut, signer)]
+    pub receiver: AccountInfo<'info>,
     #[account(mut)]
-    pub sender: Signer<'info>,
-    #[account(mut)]
-    pub sender_token: Account<'info, TokenAccount>,
-  
-    #[account(mut)]
-    pub escrow_ata: Account<'info,TokenAccount>,
+    pub receiver_token: Account<'info, TokenAccount>,
+    
     pub mint: Account<'info, Mint>,
+     #[account(mut)]
+    pub vault_account: Box<Account<'info, TokenAccount>>,
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    pub vault_authority: AccountInfo<'info>,
        /// CHECK: This is not dangerous because we don't read or write from this account
     pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
+    
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -119,15 +131,12 @@ impl<'info> FreezeToken<'info> {
 }
 
     impl<'info> ReleaseToken<'info> {
-    fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
-        
-        CpiContext::new(
-            self.token_program.to_account_info(),
-            Transfer {
-                from: self.sender_token.to_account_info(),
-                to: self.escrow_ata.to_account_info(),
-                authority: self.sender.to_account_info(),
-            },
-        )
+    fn into_transfer_to_receiver_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
+        let cpi_accounts = Transfer {
+            from: self.vault_account.to_account_info().clone(),
+            to: self.receiver_token.to_account_info().clone(),
+            authority: self.vault_authority.clone(),
+        };
+        CpiContext::new(self.token_program.clone(), cpi_accounts)
     }
     }
