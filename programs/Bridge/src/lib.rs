@@ -2,15 +2,13 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Mint, SetAuthority, TokenAccount, Transfer};
 use spl_token::instruction::AuthorityType;
 
-declare_id!("6kT1Vo3XG78jjdW58x8SeT8PWXSvKeqJWmxzrXnqWSvC");
+declare_id!("8SdY5Ysr3FMonohSeS1DNRnknviN7cVwp26ZwDj5ido1");
 
 #[program]
 pub mod bridge {
     use super::*;
     const ESCROW_PDA_SEED: &[u8] = b"escrow";
-    pub fn freeze_token(ctx: Context<FreezeToken>, amount: u64,eth_address : String,chain_id : u8) ->Result<()> {
-    
-        let eth : i32 = eth_address.parse().unwrap();
+    pub fn freeze_token(ctx: Context<FreezeToken>, amount: u64,chain_id : u8,eth_address : String) ->Result<()> {
         
          let (vault_authority, _vault_authority_bump) =
             Pubkey::find_program_address(&[ESCROW_PDA_SEED], ctx.program_id);
@@ -30,8 +28,9 @@ pub mod bridge {
             chain_id: chain_id,
             sender : ctx.accounts.sender.key(),
             mint : ctx.accounts.mint.key(),
-            eth_address : eth
+            eth_address : eth_address
         });
+        // msg!("{}",&eth_address);
 
         Ok(())
     }
@@ -51,10 +50,13 @@ pub mod bridge {
                 .with_signer(&[&authority_seeds[..]]),
             amount
         )?;
-       
-    //     emit!(MyEvent {
-    //     data: 5
-    // });
+
+        token::close_account(
+            ctx.accounts
+                .into_close_context()
+                .with_signer(&[&authority_seeds[..]]),
+        )?;
+ 
         Ok(())
     }
 }
@@ -93,6 +95,8 @@ pub struct ReleaseToken<'info> {
     #[account(mut, signer)]
     pub receiver: AccountInfo<'info>,
     #[account(mut)]
+    pub sender: AccountInfo<'info>,
+    #[account(mut)]
     pub receiver_ata: Account<'info, TokenAccount>,
     pub mint: Account<'info, Mint>,
     #[account(mut)]
@@ -110,7 +114,7 @@ pub struct MyEvent {
     pub chain_id: u8,
     pub sender : Pubkey,
     pub mint : Pubkey,
-    pub eth_address : i32
+    pub eth_address : String
 
 }
 
@@ -143,6 +147,15 @@ impl<'info> ReleaseToken<'info> {
         let cpi_accounts = Transfer {
             from: self.vault_account.to_account_info().clone(),
             to: self.receiver_ata.to_account_info().clone(),
+            authority: self.vault_authority.clone(),
+        };
+        CpiContext::new(self.token_program.clone(), cpi_accounts)
+    }
+
+     fn into_close_context(&self) -> CpiContext<'_, '_, '_, 'info, CloseAccount<'info>> {
+        let cpi_accounts = CloseAccount {
+            account: self.vault_account.to_account_info().clone(),
+            destination: self.sender.clone(),
             authority: self.vault_authority.clone(),
         };
         CpiContext::new(self.token_program.clone(), cpi_accounts)
