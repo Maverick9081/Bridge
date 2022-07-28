@@ -65,7 +65,7 @@ pub struct FreezeToken<'info> {
    #[account(mut, signer)]
     pub sender: AccountInfo<'info>,
     #[account(mut)]
-    pub sender_token: Account<'info, TokenAccount>,
+    pub sender_ata: Account<'info, TokenAccount>,
 
    pub mint: Account<'info, Mint>,
     #[account(
@@ -93,7 +93,7 @@ pub struct ReleaseToken<'info> {
     #[account(mut, signer)]
     pub receiver: AccountInfo<'info>,
     #[account(mut)]
-    pub receiver_token: Account<'info, TokenAccount>,
+    pub receiver_ata: Account<'info, TokenAccount>,
     pub mint: Account<'info, Mint>,
     #[account(mut)]
     pub vault_account: Box<Account<'info, TokenAccount>>,
@@ -119,7 +119,7 @@ impl<'info> FreezeToken<'info> {
     fn into_transfer_to_pda_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self
-                .sender_token
+                .sender_ata
                 .to_account_info()
                 .clone(),
             to: self.vault_account.to_account_info().clone(),
@@ -142,7 +142,7 @@ impl<'info> ReleaseToken<'info> {
     fn into_transfer_to_receiver_context(&self) -> CpiContext<'_, '_, '_, 'info, Transfer<'info>> {
         let cpi_accounts = Transfer {
             from: self.vault_account.to_account_info().clone(),
-            to: self.receiver_token.to_account_info().clone(),
+            to: self.receiver_ata.to_account_info().clone(),
             authority: self.vault_authority.clone(),
         };
         CpiContext::new(self.token_program.clone(), cpi_accounts)
