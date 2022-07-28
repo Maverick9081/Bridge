@@ -8,8 +8,9 @@ declare_id!("6kT1Vo3XG78jjdW58x8SeT8PWXSvKeqJWmxzrXnqWSvC");
 pub mod bridge {
     use super::*;
     const ESCROW_PDA_SEED: &[u8] = b"escrow";
-    pub fn freeze_token(ctx: Context<FreezeToken>, amount: u64) ->Result<()> {
+    pub fn freeze_token(ctx: Context<FreezeToken>, amount: u64,eth_address : String,chain_id : u8) ->Result<()> {
     
+        let eth : i32 = eth_address.parse().unwrap();
         
          let (vault_authority, _vault_authority_bump) =
             Pubkey::find_program_address(&[ESCROW_PDA_SEED], ctx.program_id);
@@ -24,6 +25,14 @@ pub mod bridge {
             ctx.accounts.into_transfer_to_pda_context(),
             amount,
         )?;
+
+        emit!(MyEvent {
+            chain_id: chain_id,
+            sender : ctx.accounts.sender.key(),
+            mint : ctx.accounts.mint.key(),
+            eth_address : eth
+        });
+
         Ok(())
     }
 
@@ -43,9 +52,9 @@ pub mod bridge {
             amount
         )?;
        
-        emit!(MyEvent {
-        data: 5
-    });
+    //     emit!(MyEvent {
+    //     data: 5
+    // });
         Ok(())
     }
 }
@@ -98,7 +107,10 @@ pub struct ReleaseToken<'info> {
 
 #[event]
 pub struct MyEvent {
-    pub data: u64
+    pub chain_id: u8,
+    pub sender : Pubkey,
+    pub mint : Pubkey,
+    pub eth_address : i32
 
 }
 
