@@ -9,6 +9,9 @@ pub mod bridge {
     use super::*;
     const ESCROW_PDA_SEED: &[u8] = b"escrow";
     pub fn freeze_token(ctx: Context<FreezeToken>, amount: u64,chain_id : u8,eth_address : String) ->Result<()> {
+
+        ctx.accounts.freezing_config.mint = ctx.accounts.mint.to_account_info().key();
+        ctx.accounts.freezing_config.sender = ctx.accounts.sender.to_account_info().key();
         
          let (vault_authority, _vault_authority_bump) =
             Pubkey::find_program_address(&[ESCROW_PDA_SEED], ctx.program_id);
@@ -38,6 +41,9 @@ pub mod bridge {
 
     pub fn release_token(ctx: Context<ReleaseToken>, amount: u64) ->Result<()> {
 
+        if ctx.accounts.freezing_config.sender != ctx.accounts.receiver.key() {
+          return err!(EscrowError::IncorrectOwner)
+        }
         const ESCROW_PDA_SEED: &[u8] = b"escrow";
         let (_vault_authority, vault_authority_bump) =
             Pubkey::find_program_address(&[ESCROW_PDA_SEED], ctx.program_id);
@@ -84,6 +90,20 @@ pub struct FreezeToken<'info> {
     )]
     pub vault_account: Account<'info, TokenAccount>,   
       ///CHECK : Not dangerous
+
+    #[account(
+        init,
+        seeds = 
+        [   
+            b"config".as_ref(),
+            mint.key().as_ref()
+        ],
+        bump,
+        payer = sender,
+        space = 90
+    )]
+    pub freezing_config : Account<'info,FreezingConfig>,
+    
     pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -104,6 +124,17 @@ pub struct ReleaseToken<'info> {
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub vault_authority: AccountInfo<'info>,
     /// CHECK: This is not dangerous because we don't read or write from this account
+    ///CHECK : Not dangerous
+
+    #[account(
+        seeds = 
+        [   
+            b"config".as_ref(),
+            mint.key().as_ref()
+        ],
+        bump,
+    )]
+    pub freezing_config : Account<'info,FreezingConfig>,
     pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -116,6 +147,19 @@ pub struct MyEvent {
     pub mint : Pubkey,
     pub eth_address : String
 
+}
+
+#[account]
+pub struct FreezingConfig {
+    pub mint : Pubkey,
+    pub sender : Pubkey,
+}
+
+#[error_code]
+pub enum EscrowError{
+  // 6003
+  #[msg("IncorrectOwner")]
+  IncorrectOwner,
 }
 
 impl<'info> FreezeToken<'info> {
