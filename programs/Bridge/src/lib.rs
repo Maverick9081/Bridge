@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, CloseAccount, Mint, SetAuthority, TokenAccount, Transfer};
 use spl_token::instruction::AuthorityType;
 
-declare_id!("8SdY5Ysr3FMonohSeS1DNRnknviN7cVwp26ZwDj5ido1");
+declare_id!("BJ1Lgyz2R9oqQuUYShkuaNgGf1ZKoeaga2LsgJeuF5zE");
 
 #[program]
 pub mod bridge {
@@ -27,13 +27,12 @@ pub mod bridge {
             amount,
         )?;
 
-        emit!(MyEvent {
+        emit!(Freeze {
             chain_id: chain_id,
             sender : ctx.accounts.sender.key(),
-            mint : ctx.accounts.mint.key(),
-            eth_address : eth_address
+            mint : ctx.accounts.mint.key()
         });
-        // msg!("{}",&eth_address);
+        msg!("{}",&eth_address);
 
         Ok(())
     }
@@ -62,6 +61,11 @@ pub mod bridge {
                 .into_close_context()
                 .with_signer(&[&authority_seeds[..]]),
         )?;
+
+        emit!(Release {
+            receiver : ctx.accounts.receiver.key(),
+            mint : ctx.accounts.mint.key()
+        });
  
         Ok(())
     }
@@ -74,8 +78,8 @@ pub struct FreezeToken<'info> {
     pub sender: AccountInfo<'info>,
     #[account(mut)]
     pub sender_ata: Account<'info, TokenAccount>,
+    pub mint: Account<'info, Mint>,
 
-   pub mint: Account<'info, Mint>,
     #[account(
         init,
         seeds = 
@@ -88,9 +92,8 @@ pub struct FreezeToken<'info> {
         token::mint = mint,
         token::authority = sender,
     )]
-    pub vault_account: Account<'info, TokenAccount>,   
-      ///CHECK : Not dangerous
-
+    pub vault_account: Account<'info, TokenAccount>,
+    ///CHECK : Not dangerous
     #[account(
         init,
         seeds = 
@@ -103,7 +106,7 @@ pub struct FreezeToken<'info> {
         space = 90
     )]
     pub freezing_config : Account<'info,FreezingConfig>,
-    
+    ///CHECK : Not dangerous
     pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -114,6 +117,7 @@ pub struct ReleaseToken<'info> {
     ///CHECK : Not dangerous
     #[account(mut, signer)]
     pub receiver: AccountInfo<'info>,
+    ///CHECK : Not dangerous
     #[account(mut)]
     pub sender: AccountInfo<'info>,
     #[account(mut)]
@@ -123,9 +127,8 @@ pub struct ReleaseToken<'info> {
     pub vault_account: Box<Account<'info, TokenAccount>>,
     /// CHECK: This is not dangerous because we don't read or write from this account
     pub vault_authority: AccountInfo<'info>,
-    /// CHECK: This is not dangerous because we don't read or write from this account
+    
     ///CHECK : Not dangerous
-
     #[account(
         seeds = 
         [   
@@ -135,18 +138,23 @@ pub struct ReleaseToken<'info> {
         bump,
     )]
     pub freezing_config : Account<'info,FreezingConfig>,
+    ///CHECK : Not dangerous
     pub token_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
 
 #[event]
-pub struct MyEvent {
+pub struct Freeze {
     pub chain_id: u8,
     pub sender : Pubkey,
     pub mint : Pubkey,
-    pub eth_address : String
+}
 
+#[event]
+pub struct Release {
+    pub receiver : Pubkey,
+    pub mint : Pubkey,
 }
 
 #[account]
